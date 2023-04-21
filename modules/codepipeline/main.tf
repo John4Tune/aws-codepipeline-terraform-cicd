@@ -6,7 +6,7 @@
 
 resource "aws_codepipeline" "terraform_pipeline" {
 
-  name     = "${var.project_name}-pipeline"
+  name     = "${var.project_name}${var.environment}"
   role_arn = var.codepipeline_role_arn
   tags     = var.tags
 
@@ -23,7 +23,7 @@ resource "aws_codepipeline" "terraform_pipeline" {
     name = "Source"
 
     action {
-      name             = "Download-Source"
+      name             = "Source"
       category         = "Source"
       owner            = "AWS"
       version          = "1"
@@ -35,7 +35,7 @@ resource "aws_codepipeline" "terraform_pipeline" {
       configuration = {
         RepositoryName       = var.source_repo_name
         BranchName           = var.source_repo_branch
-        PollForSourceChanges = "true"
+        PollForSourceChanges = "false"
       }
     }
   }
@@ -44,22 +44,90 @@ resource "aws_codepipeline" "terraform_pipeline" {
     for_each = var.stages
 
     content {
-      name = "Stage-${stage.value["name"]}"
-      action {
-        category         = stage.value["category"]
-        name             = "Action-${stage.value["name"]}"
-        owner            = stage.value["owner"]
-        provider         = stage.value["provider"]
-        input_artifacts  = [stage.value["input_artifacts"]]
-        output_artifacts = [stage.value["output_artifacts"]]
-        version          = "1"
-        run_order        = index(var.stages, stage.value) + 2
+      name = stage.value["name"]
+      dynamic "action" {
+        for_each = stage.value["actions"]
 
-        configuration = {
-          ProjectName = stage.value["provider"] == "CodeBuild" ? "${var.project_name}-${stage.value["name"]}" : null
+        content {
+          name             = action.value["action_name"]
+          category         = action.value["category"]
+          owner            = action.value["owner"]
+          provider         = action.value["provider"]
+          input_artifacts  = [action.value["input_artifacts"]]
+          output_artifacts = [action.value["output_artifacts"]]
+          version          = "1"
+          run_order        = action.value["action_order"]
+
+          configuration = action.value["configuration"]
         }
       }
     }
   }
+}
 
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "pipeline_trigger" {
+  name               = "${var.project_name}${var.environment}-${var.source_repo_branch}-codepipeline-event-role"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+data "aws_iam_policy_document" "pipeline_trigger" {
+  statement {
+    effect    = "Allow"
+    actions   = ["codepipeline:StartPipelineExecution"]
+    resources = [aws_codepipeline.terraform_pipeline.arn]
+  }
+}
+resource "aws_iam_role_policy" "pipeline_trigger" {
+  name   = "execute_pipeline"
+  role   = aws_iam_role.pipeline_trigger.id
+  policy = data.aws_iam_policy_document.pipeline_trigger.json
+}
+
+resource "aws_cloudwatch_event_rule" "pipeline_trigger" {
+  name        = "${var.project_name}${var.environment}-${var.source_repo_branch}-pipeline-trigger"
+  description = "CodeCommit Change"
+
+  event_pattern = jsonencode({
+    "source" : [
+      "aws.codecommit"
+    ],
+    "detail-type" : [
+      "CodeCommit Repository State Change"
+    ],
+    "resources" : [
+      "${var.source_repo_arn}"
+    ],
+    "detail" : {
+      "event" : [
+        "referenceCreated",
+        "referenceUpdated"
+      ],
+      "referenceType" : [
+        "branch"
+      ],
+      "referenceName" : [
+        "${var.source_repo_branch}"
+      ]
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "pipeline_trigger" {
+  rule      = aws_cloudwatch_event_rule.pipeline_trigger.name
+  target_id = "ExecutePipeline"
+  arn       = aws_codepipeline.terraform_pipeline.arn
+  role_arn  = aws_iam_role.pipeline_trigger.arn
 }

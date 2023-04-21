@@ -30,6 +30,10 @@ variable "build_projects" {
   type        = list(string)
 }
 
+variable "buildspecs" {
+  type = list(string)
+}
+
 variable "builder_compute_type" {
   description = "Information about the compute resources the build project will use"
   type        = string
@@ -59,3 +63,5 @@ variable "kms_key_arn" {
   description = "ARN of KMS key for encryption"
   type        = string
 }
+
+variable "environment" {}

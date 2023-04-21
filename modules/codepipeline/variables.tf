@@ -14,6 +14,11 @@ variable "source_repo_name" {
   type        = string
 }
 
+variable "source_repo_arn" {
+  description = "Source repo arn of the CodeCommit repository"
+  type        = string
+}
+
 variable "source_repo_branch" {
   description = "Default branch in the Source repo for which CodePipeline needs to be configured"
   type        = string
@@ -41,5 +46,19 @@ variable "tags" {
 
 variable "stages" {
   description = "List of Map containing information about the stages of the CodePipeline"
-  type        = list(map(any))
+  type = list(object({
+    name = string,
+    actions = list(object({
+      action_order     = number,
+      action_name      = string,
+      category         = string,
+      owner            = string,
+      provider         = string,
+      input_artifacts  = string,
+      output_artifacts = string,
+      configuration    = map(any),
+    }))
+  }))
 }
+
+variable "environment" {}

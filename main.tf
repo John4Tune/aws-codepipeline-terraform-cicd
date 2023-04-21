@@ -9,7 +9,7 @@ terraform {
 
   required_providers {
     aws = {
-      source = "hashicorp/aws"
+      source  = "hashicorp/aws"
       version = ">= 4.20.1"
     }
   }
@@ -58,9 +58,11 @@ module "codebuild_terraform" {
   source = "./modules/codebuild"
 
   project_name                        = var.project_name
+  environment                         = var.environment
   role_arn                            = module.codepipeline_iam_role.role_arn
   s3_bucket_name                      = module.s3_artifacts_bucket.bucket
   build_projects                      = var.build_projects
+  buildspecs                          = var.buildspecs
   build_project_source                = var.build_project_source
   builder_compute_type                = var.builder_compute_type
   builder_image                       = var.builder_image
@@ -75,6 +77,17 @@ module "codebuild_terraform" {
   }
 }
 
+module "codedeploy_terraform" {
+  source = "./modules/codedeploy"
+
+  codedeploy_application_name                = var.project_name
+  environment                                = var.environment
+  role_arn                                   = module.codepipeline_iam_role.role_arn
+  create_new_codedeploy_application          = var.create_new_codedeploy_application
+  deployment_groups                          = var.deployment_groups
+  bluegreen_termination_wait_time_in_minutes = var.bluegreen_termination_wait_time_in_minutes
+}
+
 module "codepipeline_kms" {
   source                = "./modules/kms"
   codepipeline_role_arn = module.codepipeline_iam_role.role_arn
@@ -84,7 +97,6 @@ module "codepipeline_kms" {
     Account_ID   = local.account_id
     Region       = local.region
   }
-
 }
 
 module "codepipeline_iam_role" {
@@ -111,7 +123,9 @@ module "codepipeline_terraform" {
   source = "./modules/codepipeline"
 
   project_name          = var.project_name
+  environment           = var.environment
   source_repo_name      = var.source_repo_name
+  source_repo_arn       = module.codecommit_infrastructure_source_repo.arn
   source_repo_branch    = var.source_repo_branch
   s3_bucket_name        = module.s3_artifacts_bucket.bucket
   codepipeline_role_arn = module.codepipeline_iam_role.role_arn

@@ -25,6 +25,13 @@ resource "aws_iam_role" "codepipeline_role" {
         "Service": "codebuild.amazonaws.com"
       },
       "Action": "sts:AssumeRole"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codedeploy.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
     }
   ]
 }
@@ -125,4 +132,10 @@ resource "aws_iam_role_policy_attachment" "codepipeline_role_attach" {
   count      = var.create_new_role ? 1 : 0
   role       = aws_iam_role.codepipeline_role[0].name
   policy_arn = aws_iam_policy.codepipeline_policy[0].arn
+}
+
+resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
+  count      = var.create_new_role ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/AWSCodeDeployDeployerAccess"
+  role       = aws_iam_role.codepipeline_role[0].name
 }

@@ -49,12 +49,39 @@ variable "environment" {
 
 variable "stage_input" {
   description = "Tags to be attached to the CodePipeline"
-  type        = list(map(any))
+  type = list(object({
+    name = string,
+    actions = list(object({
+      action_order     = number,
+      action_name      = string,
+      category         = string,
+      owner            = string,
+      provider         = string,
+      input_artifacts  = string,
+      output_artifacts = string,
+      configuration    = map(any),
+    }))
+  }))
 }
 
 variable "build_projects" {
   description = "Tags to be attached to the CodePipeline"
   type        = list(string)
+}
+
+variable "buildspecs" {
+  type = list(string)
+}
+
+variable "deployment_groups" {
+  type = list(object({
+    name            = string,
+    style           = string,
+    instance_target = list(string),
+    asg_target      = list(string),
+    onprem_target   = list(string),
+    lb_tg           = string
+  }))
 }
 
 variable "builder_compute_type" {
@@ -66,7 +93,7 @@ variable "builder_compute_type" {
 variable "builder_image" {
   description = "Docker Image to be used by codebuild"
   type        = string
-  default     = "aws/codebuild/amazonlinux2-x86_64-standard:3.0"
+  default     = "aws/codebuild/amazonlinux2-x86_64-standard:4.0"
 }
 
 variable "builder_type" {
@@ -82,7 +109,10 @@ variable "builder_image_pull_credentials_type" {
 }
 
 variable "build_project_source" {
-  description = "aws/codebuild/standard:4.0"
+  description = "Type of codebuild project source"
   type        = string
   default     = "CODEPIPELINE"
 }
+
+variable "create_new_codedeploy_application" {}
+variable "bluegreen_termination_wait_time_in_minutes" {}
